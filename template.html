@@ -128,7 +128,7 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
   <p class="note" id="hmNote"></p>
 </section>
 
-<p class="note">Source: Metabase question 89a30410. Go-live weeks are ISO weeks, written year then week (2026W45). Partial weeks (the most recent week of each active cohort) are hidden by default. S/GMV above 150% usually means a very small GMV base, so the axis is capped by default and the real value appears in the tooltip.</p>
+<p class="note">Source: Metabase question 89a30410. Go-live weeks are ISO weeks, written as 'year-week, for example '26-W45. Partial weeks (the most recent week of each active cohort) are hidden by default. S/GMV above 150% usually means a very small GMV base, so the axis is capped by default and the real value appears in the tooltip.</p>
 </div>
 
 <div class="tip" id="tip"></div>
@@ -144,7 +144,7 @@ const $=id=>document.getElementById(id);
 const mon=c=>{const y=Math.floor(c/100),w=c%100;const j=new Date(Date.UTC(y,0,4));const d=(j.getUTCDay()+6)%7;
   const t=new Date(j.getTime()+((w-1)*7-d)*864e5);return t};
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const cl=c=>`${Math.floor(c/100)}W${String(c%100).padStart(2,'0')}`;
+const cl=c=>`'${String(Math.floor(c/100)).slice(2)}-W${String(c%100).padStart(2,'0')}`;
 const cd=c=>{const t=mon(c);return `w/c ${t.getUTCDate()} ${MN[t.getUTCMonth()]} ${t.getUTCFullYear()}`};
 const soFar=new Set(R.filter(r=>r.k===0&&r.p).map(r=>r.c));
 const pct=(x,d=1)=>x==null||!isFinite(x)?'–':x.toFixed(d)+'%';
