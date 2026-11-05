@@ -361,7 +361,7 @@ function drawCats(){
   const get=(cat,c)=>{const r=idx.get(cat+'|'+c+'|'+st.age);return r&&(st.partial||!r.p)?r:null};
   const xs=cs_.map(c=>({short:cl(c),label:cl(c),sub:cd(c)}));
   $('catTitle').textContent=M.name+(m==='share'?'':', '+(st.ctype==='v'?'video':'non-video'))+' by category';
-  $('catCap').textContent=CMDESC[m]+'. One line per category. Choose which categories to show.';
+  $('catCap').textContent=CMDESC[m]+'. One line per category. The categories you pick here also decide which individual charts appear below.';
   $('ctypeSeg').hidden=m==='share';
   $('catQuick').innerHTML='<button type="button" data-q="6">Top 6</button><button type="button" data-q="all">All</button><button type="button" data-q="0">Clear</button><span>'+st.catOn.size+' of '+CATS.length+' shown</span>';
   $('catQuick').querySelectorAll('button').forEach(b=>b.onclick=()=>{const q=b.dataset.q;st.catOn=new Set(q==='all'?CATS:q==='0'?[]:CATS.slice(0,+q));drawCats()});
@@ -370,11 +370,12 @@ function drawCats(){
   const sers=CATS.filter(c=>st.catOn.has(c)).map(c=>({name:catName(c),color:catColor(c),vals:cs_.map(k=>catVal(get(c,k),m,st.ctype))}));
   line({el:'cmix',label:M.name+' by category',xs,series:sers,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true});
 
-  $('miniTitle').textContent=M.name+' for each category';
+  $('miniTitle').textContent=M.name+' for each selected category';
   $('miniLegend').innerHTML=m==='share'?'':'<span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i>Non-video</span>';
-  $('mini').innerHTML=CATS.map((c,i)=>{const n=cs_.reduce((a,k)=>{const r=idx.get(c+'|'+k+'|0');return a+(r?r.g:0)},0);
+  const shown=CATS.filter(c=>st.catOn.has(c));
+  $('mini').innerHTML=!shown.length?'<div class="empty">Select at least one category above to see its chart.</div>':shown.map((c,i)=>{const n=cs_.reduce((a,k)=>{const r=idx.get(c+'|'+k+'|0');return a+(r?r.g:0)},0);
     return `<div class="card"><h3><span><i class="sw" style="background:${catColor(c)}"></i>${catName(c)}</span><small>${n.toLocaleString('en-IN')} sellers</small></h3><div class="chart" id="m${i}"></div></div>`}).join('');
-  CATS.forEach((c,i)=>{const v=cs_.map(k=>get(c,k));
+  shown.forEach((c,i)=>{const v=cs_.map(k=>get(c,k));
     const series=m==='share'?[{name:'Video share',color:'var(--video)',vals:v.map(r=>catVal(r,m))}]
       :[{name:'Video',color:'var(--video)',vals:v.map(r=>catVal(r,m,'v'))},{name:'Non-video',color:'var(--other)',vals:v.map(r=>catVal(r,m,'o'))}];
     line({el:'m'+i,label:catName(c),xs,series,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,compact:true,

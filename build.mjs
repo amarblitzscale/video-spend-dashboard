@@ -24,7 +24,9 @@ const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r
 
 const clientId = process.env.GOOGLE_CLIENT_ID || '';
 if (!clientId) console.warn('GOOGLE_CLIENT_ID is not set: the sign-in page will show "not configured".');
-const html = readFileSync('template.html', 'utf8')
+// The template is written to sit inside a page wrapper; add the document head for standalone hosting.
+const HEAD = '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>html,body{margin:0}img{max-width:100%}</style>\n';
+const html = HEAD + readFileSync('template.html', 'utf8')
   .replace('__ROWS__', JSON.stringify(rows))
   .replace('__GOOGLE_CLIENT_ID__', clientId);
 mkdirSync('dist', { recursive: true });
