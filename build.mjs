@@ -17,7 +17,11 @@ const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r
   r.sellers_on_video, r.total_spend, r.video_spend, r.other_spend, r.video_sgmv_pct, r.other_sgmv_pct,
   r.partial_week ? 1 : 0, r.video_ctr_pct, r.other_ctr_pct]);
 
-const html = readFileSync('template.html', 'utf8').replace('__ROWS__', JSON.stringify(rows));
+const clientId = process.env.GOOGLE_CLIENT_ID || '';
+if (!clientId) console.warn('GOOGLE_CLIENT_ID is not set: the sign-in page will show "not configured".');
+const html = readFileSync('template.html', 'utf8')
+  .replace('__ROWS__', JSON.stringify(rows))
+  .replace('__GOOGLE_CLIENT_ID__', clientId);
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', html);
 console.log(`Built dist/index.html from ${rows.length} rows`);
