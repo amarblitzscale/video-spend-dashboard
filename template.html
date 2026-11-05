@@ -77,7 +77,9 @@ svg text{fill:var(--muted);font-family:var(--font);font-size:11px}
 .tip b{font-weight:600}.tip .r{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
 .tip .r i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
 .tip .m{color:var(--muted);margin-top:3px}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg{display:inline-flex;max-width:100%;border:1px solid var(--line);border-radius:6px;overflow-x:auto;background:var(--surface)}
+.seg button{flex:none}
+.ctl>*{min-width:0}
 .seg button{font:inherit;font-size:12px;border:0;background:none;color:var(--ink2);padding:6px 10px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
 .hm{overflow:auto;max-height:640px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
