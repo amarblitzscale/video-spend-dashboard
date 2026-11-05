@@ -1,7 +1,8 @@
 -- Golive cohort x week-since-golive (W0-W10) x seller class: Meta spend and ad-attributed GMV on video vs other creatives
--- Database: 3 (BigQuery). Same logic as card 17607, with two changes:
+-- Database: 3 (BigQuery). Same logic as card 17607, with these changes:
 --   1. rows are split by seller_class (outlier / normal), so the dashboard can switch outliers on and off
---   2. video_gmv / other_gmv are returned, so S/GMV can be recomputed exactly for any combination
+--   2. additive sums (spend, GMV, impressions, clicks, orders) are returned for video and other creatives, so
+--      S/GMV, CPM, CTR, CVR (orders / clicks) and AOV (GMV / orders) can be recomputed for any combination
 --
 -- seller_class is decided once per seller from its W0 (golive week) Meta numbers, then applied to W0-W10:
 --   outlier   = W0 GMV > 0 and W0 spend / W0 GMV < 5% (sellers with no W0 GMV are not outliers)
@@ -53,7 +54,7 @@ ad_type AS (
 
 spend AS (
   SELECT a.golive_week, a.wk, a.seller_id, a.ad_id, t.creative,
-         SUM(a.spend) AS spend
+         SUM(a.spend) AS spend, SUM(a.impressions) AS imp, SUM(a.clicks) AS clk
   FROM ads a
   JOIN ad_type t USING (ad_id)
   GROUP BY 1, 2, 3, 4, 5
@@ -62,7 +63,7 @@ spend AS (
 orders AS (
   SELECT c.golive_week, o.utm_content AS ad_id,
          DATE_DIFF(DATE_TRUNC(o.order_date_ist, ISOWEEK), c.w0_mon, WEEK) AS wk,
-         SUM(o.gmv) AS gmv
+         SUM(o.gmv) AS gmv, SUM(o.order_count) AS ord
   FROM `blitzscale-prod-project.csv_upload.fb_ads_order_summary_daily` o
   JOIN cohort c ON o.seller_id = c.seller_id
   WHERE o.order_date_ist >= DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 56 WEEK)
@@ -71,7 +72,7 @@ orders AS (
 ),
 
 base AS (
-  SELECT s.*, IFNULL(o.gmv, 0) AS gmv
+  SELECT s.*, IFNULL(o.gmv, 0) AS gmv, IFNULL(o.ord, 0) AS ord
   FROM spend s
   LEFT JOIN orders o
     ON o.ad_id = s.ad_id AND o.wk = s.wk AND o.golive_week = s.golive_week
@@ -108,6 +109,12 @@ SELECT
   ROUND(SUM(IF(b.creative != 'video', b.spend, 0)))                        AS other_spend,
   ROUND(SUM(IF(b.creative = 'video', b.gmv, 0)))                           AS video_gmv,
   ROUND(SUM(IF(b.creative != 'video', b.gmv, 0)))                          AS other_gmv,
+  SUM(IF(b.creative = 'video', b.imp, 0))                                  AS video_imp,
+  SUM(IF(b.creative != 'video', b.imp, 0))                                 AS other_imp,
+  SUM(IF(b.creative = 'video', b.clk, 0))                                  AS video_clk,
+  SUM(IF(b.creative != 'video', b.clk, 0))                                 AS other_clk,
+  SUM(IF(b.creative = 'video', b.ord, 0))                                  AS video_orders,
+  SUM(IF(b.creative != 'video', b.ord, 0))                                 AS other_orders,
   ANY_VALUE(DATE_ADD(c.w0_mon, INTERVAL b.wk * 7 + 6 DAY)) >= CURRENT_DATE('Asia/Kolkata') AS partial_week
 FROM base b
 JOIN seller_cls sc USING (golive_week, seller_id)

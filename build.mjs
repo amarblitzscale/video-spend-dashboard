@@ -14,11 +14,13 @@ else {
 if (!Array.isArray(d) || d.length < 50) throw new Error(`Unexpected response: ${Array.isArray(d) ? d.length + ' rows' : typeof d}`);
 
 const need = ['golive_week','week_since_golive','seller_class','golives','sellers_spending','sellers_on_video','total_spend',
-  'video_spend','other_spend','video_gmv','other_gmv','partial_week'];
+  'video_spend','other_spend','video_gmv','other_gmv','video_imp','other_imp','video_clk','other_clk',
+  'video_orders','other_orders','partial_week'];
 for (const k of need) if (!(k in d[0])) throw new Error(`Column missing from question: ${k}`);
 
 const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r.seller_class, r.golives, r.sellers_spending,
-  r.sellers_on_video, r.total_spend, r.video_spend, r.other_spend, r.video_gmv, r.other_gmv, r.partial_week ? 1 : 0]);
+  r.sellers_on_video, r.total_spend, r.video_spend, r.other_spend, r.video_gmv, r.other_gmv, r.video_imp, r.other_imp, r.video_clk, r.other_clk,
+  r.video_orders, r.other_orders, r.partial_week ? 1 : 0]);
 
 const clientId = process.env.GOOGLE_CLIENT_ID || '';
 if (!clientId) console.warn('GOOGLE_CLIENT_ID is not set: the sign-in page will show "not configured".');
