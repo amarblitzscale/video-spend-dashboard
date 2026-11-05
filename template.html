@@ -7,17 +7,17 @@
   --bg:#f5f6f8; --surface:#ffffff; --ink:#15191f; --ink2:#4a5360; --muted:#79828f; --line:#e3e6eb; --grid:#eceef2;
   --video:#2559d9; --other:#d9822b; --video-soft:#2559d91f; --accent:#2559d9;
   --good:#1a7f4b; --bad:#b4372b;
-  --heat0:#eef2fc; --heat1:#2559d9;
+  --rag-r:#ee9a92; --rag-y:#f4df8c; --rag-g:#8dce9f;
   --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#12151a; --surface:#1a1e25; --ink:#e8ebf0; --ink2:#aab2be; --muted:#7f8896; --line:#2b313a; --grid:#232831;
   --video:#6c9bff; --other:#f0a458; --video-soft:#6c9bff26; --accent:#6c9bff; --good:#4cc38a; --bad:#ff8a7a;
-  --heat0:#1d2638; --heat1:#6c9bff; color-scheme:dark}}
+  --rag-r:#8c3b36; --rag-y:#7b6b25; --rag-g:#2f6f4b; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12151a; --surface:#1a1e25; --ink:#e8ebf0; --ink2:#aab2be; --muted:#7f8896; --line:#2b313a; --grid:#232831;
   --video:#6c9bff; --other:#f0a458; --video-soft:#6c9bff26; --accent:#6c9bff; --good:#4cc38a; --bad:#ff8a7a;
-  --heat0:#1d2638; --heat1:#6c9bff; color-scheme:dark}
+  --rag-r:#8c3b36; --rag-y:#7b6b25; --rag-g:#2f6f4b; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;
   padding-block:0 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -255,14 +255,20 @@ function cellVal(r){if(!r)return null;
   if(st.metric==='vs')return r.vs>0?r.vs:null;
   if(st.metric==='os')return r.os>0?r.os:null;
   return r.vs>0&&r.os>0?r.vs-r.os:null}
-function mix(t){ // blend heat0->heat1 in the browser via color-mix
-  return `color-mix(in oklab,var(--heat1) ${Math.round(t*100)}%,var(--heat0))`}
+// t: 0 = bad (red), .5 = yellow, 1 = good (green)
+function mix(t){
+  return t<.5?`color-mix(in oklab,var(--rag-y) ${Math.round(t*200)}%,var(--rag-r))`
+             :`color-mix(in oklab,var(--rag-g) ${Math.round((t-.5)*200)}%,var(--rag-y))`}
 function drawHeat(){
   const rows=sel(),map=new Map(rows.map(r=>[r.c+'_'+r.k,r]));
   const cs_=selCohorts();
   const vals=rows.map(cellVal).filter(v=>v!=null).sort((a,b)=>a-b);
-  const lo=st.metric==='gap'?vals[Math.floor(vals.length*.05)]:0,hi=vals[Math.floor(vals.length*.95)]||1;
-  const diverging=st.metric==='gap';
+  const lo=vals[Math.floor(vals.length*.05)]||0,hi=vals[Math.floor(vals.length*.95)]||1;
+  const M=Math.max(Math.abs(lo),Math.abs(hi))||1;
+  const goodness=v=>{
+    if(st.metric==='share')return Math.max(0,Math.min(1,(v-lo)/((hi-lo)||1)));       // higher is better
+    if(st.metric==='gap')return Math.max(0,Math.min(1,.5-v/(2*M)));                   // negative gap is better
+    return Math.max(0,Math.min(1,1-(v-lo)/((hi-lo)||1)))};                           // lower S/GMV is better
   if(!cs_.length){$('hm').innerHTML='<div class="empty">Select at least one go-live week</div>';return}
   let h='<table><thead><tr><th>Go-live cohort</th><th>Go-lives</th>'+ages.map(k=>`<th>W${k}</th>`).join('')+'</tr></thead><tbody>';
   [...cs_].reverse().forEach(c=>{
@@ -270,14 +276,12 @@ function drawHeat(){
     h+=`<tr><th>${cl(c)}</th><td style="color:var(--muted)">${g??''}</td>`;
     ages.forEach(k=>{const r=map.get(c+'_'+k),v=cellVal(r);
       if(v==null){h+='<td class="na">·</td>';return}
-      const t=Math.max(0,Math.min(1,(v-lo)/((hi-lo)||1)));
-      const bg=diverging?mix(t):mix(t);
-      const light=t>.55;
-      h+=`<td class="${r.p?'pt':''}" data-c="${c}" data-k="${k}" style="background:${bg};color:${light?'var(--surface)':'var(--ink)'}">${v.toFixed(st.metric==='share'?1:0)}</td>`});
+      const bg=mix(goodness(v));
+      h+=`<td class="${r.p?'pt':''}" data-c="${c}" data-k="${k}" style="background:${bg};color:var(--ink)">${v.toFixed(st.metric==='share'?1:0)}</td>`});
     h+='</tr>'});
   h+='</tbody></table>';$('hm').innerHTML=h;
-  $('hmNote').textContent=({share:'Video share of Meta spend, %.',vs:'Video S/GMV, %. Colour scale ends at the 95th percentile so single outliers do not wash out the grid.',
-    os:'Non-video S/GMV, %. Colour scale ends at the 95th percentile.',gap:'Video S/GMV minus non-video S/GMV, in percentage points. Darker means video is less efficient.'})[st.metric]+(st.partial?' Dashed cells are partial weeks.':'');
+  $('hmNote').textContent=({share:'Video share of Meta spend, %. Green is a higher video share, red a lower one.',vs:'Video S/GMV, %. Green is lower (more efficient), red is higher. The colour scale runs from the 5th to the 95th percentile so single outliers do not wash out the grid.',
+    os:'Non-video S/GMV, %. Green is lower (more efficient), red is higher. The colour scale runs from the 5th to the 95th percentile.',gap:'Video S/GMV minus non-video S/GMV, in percentage points. Green means video is more efficient than non-video, red means less, yellow is level.'})[st.metric]+(st.partial?' Dashed cells are partial weeks.':'');
   $('hm').querySelectorAll('td[data-c]').forEach(td=>{
     td.onpointermove=ev=>{const r=map.get(td.dataset.c+'_'+td.dataset.k);
       showTip(`<b>${cl(+r.c)} · W${r.k}</b> <span style="color:var(--muted)">${cd(+r.c)}</span>${r.p?' <span style="color:var(--muted)">(partial)</span>':''}
