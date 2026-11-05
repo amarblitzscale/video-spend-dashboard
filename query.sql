@@ -3,6 +3,8 @@
 --   1. rows are split by seller_class (outlier / normal), so the dashboard can switch outliers on and off
 --   2. additive sums (spend, GMV, impressions, clicks, orders) are returned for video and other creatives, so
 --      S/GMV, CPM, CTR, CVR (orders / clicks) and AOV (GMV / orders) can be recomputed for any combination
+--   3. rows are also split by category: the seller's top-level (L1) category with the most orders
+--      (same rule as the "seller level category mapping - L1" question); sellers without one are 'Uncategorised'
 --
 -- seller_class is decided once per seller from its W0 (golive week) Meta numbers, then applied to W0-W10:
 --   outlier   = W0 GMV > 0 and W0 spend / W0 GMV < 5% (sellers with no W0 GMV are not outliers)
@@ -26,6 +28,20 @@ cohort AS (
    AND CAST(v.year_week AS INT64) = g.golive_week
   WHERE g.golive_week >= CAST(FORMAT_DATE('%G%V', DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 52 WEEK)) AS INT64)
   GROUP BY 1, 2
+),
+
+seller_category AS (
+  SELECT seller_id, l1 FROM (
+    SELECT oi.seller_id, ct.l1,
+           ROW_NUMBER() OVER (PARTITION BY oi.seller_id ORDER BY COUNT(oi.seller_group_id) DESC, ct.l1) AS rk
+    FROM `blitzscale-prod-project.nushop.orderitems` oi
+    JOIN `blitzscale-prod-project.nushop.category_tagged` ct ON ct.product_id = oi.customer_product_short_id
+    WHERE oi.seller_id IN (SELECT seller_id FROM cohort)
+      AND oi.seller_last_status NOT IN ('invalid', 'initiated', 'enqueued')
+      AND DATE(oi.createdat) BETWEEN '2023-01-01' AND CURRENT_DATE()
+      AND ct.l1 IS NOT NULL AND ct.l1 != ''
+    GROUP BY 1, 2)
+  WHERE rk = 1
 ),
 
 ads AS (
@@ -88,19 +104,22 @@ seller_w0 AS (
 seller_cls AS (
   SELECT c.golive_week, c.seller_id,
          CASE WHEN IFNULL(w.w0_gmv, 0) > 0 AND w.w0_spend / w.w0_gmv < 0.05 THEN 'outlier'
-              ELSE 'normal' END AS seller_class
+              ELSE 'normal' END AS seller_class,
+         IFNULL(k.l1, 'Uncategorised') AS category
   FROM cohort c
   LEFT JOIN seller_w0 w USING (golive_week, seller_id)
+  LEFT JOIN seller_category k ON k.seller_id = c.seller_id
 ),
 
 golive_counts AS (
-  SELECT golive_week, seller_class, COUNT(*) AS golives FROM seller_cls GROUP BY 1, 2
+  SELECT golive_week, seller_class, category, COUNT(*) AS golives FROM seller_cls GROUP BY 1, 2, 3
 )
 
 SELECT
   b.golive_week,
   CONCAT('W', CAST(b.wk AS STRING))                                        AS week_since_golive,
   sc.seller_class,
+  sc.category,
   gc.golives,
   COUNT(DISTINCT b.seller_id)                                              AS sellers_spending,
   COUNT(DISTINCT IF(b.creative = 'video', b.seller_id, NULL))              AS sellers_on_video,
@@ -118,8 +137,8 @@ SELECT
   ANY_VALUE(DATE_ADD(c.w0_mon, INTERVAL b.wk * 7 + 6 DAY)) >= CURRENT_DATE('Asia/Kolkata') AS partial_week
 FROM base b
 JOIN seller_cls sc USING (golive_week, seller_id)
-JOIN golive_counts gc USING (golive_week, seller_class)
+JOIN golive_counts gc USING (golive_week, seller_class, category)
 JOIN (SELECT golive_week, MIN(w0_mon) AS w0_mon FROM cohort GROUP BY 1) c USING (golive_week)
 WHERE b.wk BETWEEN 0 AND 10
-GROUP BY b.golive_week, b.wk, sc.seller_class, gc.golives
-ORDER BY b.golive_week, b.wk, sc.seller_class
+GROUP BY b.golive_week, b.wk, sc.seller_class, sc.category, gc.golives
+ORDER BY b.golive_week, b.wk, sc.seller_class, sc.category
