@@ -2,20 +2,23 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 const URL_ = process.env.METABASE_URL ||
-  'https://metabase.kaip.in/api/public/card/89a30410-6d20-40b9-9462-f6c46e335fed/query/json';
+  'https://metabase.kaip.in/api/public/card/69814e4c-a8a1-4022-aa10-92b0201e7593/query/json';
 
-const res = await fetch(URL_);
-if (!res.ok) throw new Error(`Metabase returned ${res.status}`);
-const d = await res.json();
+let d;
+if (process.env.LOCAL_JSON) d = JSON.parse(readFileSync(process.env.LOCAL_JSON, 'utf8'));   // local testing only
+else {
+  const res = await fetch(URL_);
+  if (!res.ok) throw new Error(`Metabase returned ${res.status}`);
+  d = await res.json();
+}
 if (!Array.isArray(d) || d.length < 50) throw new Error(`Unexpected response: ${Array.isArray(d) ? d.length + ' rows' : typeof d}`);
 
-const need = ['golive_week','week_since_golive','golives','sellers_spending','sellers_on_video','total_spend',
-  'video_spend','other_spend','video_sgmv_pct','other_sgmv_pct','partial_week','video_ctr_pct','other_ctr_pct'];
+const need = ['golive_week','week_since_golive','seller_class','golives','sellers_spending','sellers_on_video','total_spend',
+  'video_spend','other_spend','video_gmv','other_gmv','partial_week'];
 for (const k of need) if (!(k in d[0])) throw new Error(`Column missing from question: ${k}`);
 
-const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r.golives, r.sellers_spending,
-  r.sellers_on_video, r.total_spend, r.video_spend, r.other_spend, r.video_sgmv_pct, r.other_sgmv_pct,
-  r.partial_week ? 1 : 0, r.video_ctr_pct, r.other_ctr_pct]);
+const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r.seller_class, r.golives, r.sellers_spending,
+  r.sellers_on_video, r.total_spend, r.video_spend, r.other_spend, r.video_gmv, r.other_gmv, r.partial_week ? 1 : 0]);
 
 const clientId = process.env.GOOGLE_CLIENT_ID || '';
 if (!clientId) console.warn('GOOGLE_CLIENT_ID is not set: the sign-in page will show "not configured".');

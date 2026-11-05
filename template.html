@@ -112,6 +112,7 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
   <div class="chips" id="chips" role="group" aria-label="Go-live weeks"></div>
   <div class="bar" role="group" aria-label="Options">
     <label class="chk"><input type="checkbox" id="partial"> Include partial weeks</label>
+    <label class="chk"><input type="checkbox" id="exOut"> Exclude outlier sellers (W0 S/GMV under 5%)</label>
     <label class="chk"><input type="checkbox" id="cap" checked> Cap S/GMV axis at 150%</label>
   </div>
 </section>
@@ -151,20 +152,31 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
 <script>
 const RAW=__ROWS__;
 // [golive_week, age, golives, sellers_spending, sellers_on_video, total_spend, video_spend, other_spend, video_sgmv, other_sgmv, partial, vctr, octr]
-const R=RAW.map(a=>({c:a[0],k:a[1],g:a[2],tot:a[5],v:a[6],o:a[7],vs:a[8],os:a[9],p:a[10]===1}));
-R.forEach(r=>{r.vg=r.vs>0?r.v/(r.vs/100):0;r.og=r.os>0?r.o/(r.os/100):0});
-const cohorts=[...new Set(R.map(r=>r.c))].sort((a,b)=>a-b);
-const ages=[...new Set(R.map(r=>r.k))].sort((a,b)=>a-b);
+const RC=RAW.map(a=>({c:a[0],k:a[1],cls:a[2],g:a[3],tot:a[6],v:a[7],o:a[8],vg:a[9],og:a[10],p:a[11]===1}));
+// One row per cohort x week. Outlier sellers (W0 S/GMV under 5%) are left out when the toggle is on.
+function build(){
+  const m=new Map();
+  RC.forEach(r=>{
+    if(r.cls==='outlier'&&st.exOut)return;
+    const key=r.c+'_'+r.k;let x=m.get(key);
+    if(!x){x={c:r.c,k:r.k,g:0,tot:0,v:0,o:0,vg:0,og:0,p:false};m.set(key,x)}
+    x.g+=r.g;x.tot+=r.tot;x.v+=r.v;x.o+=r.o;x.vg+=r.vg;x.og+=r.og;x.p=x.p||r.p});
+  const out=[...m.values()];
+  out.forEach(x=>{x.vs=x.vg>0?x.v/x.vg*100:null;x.os=x.og>0?x.o/x.og*100:null});
+  return out}
+let R=[];
+const cohorts=[...new Set(RC.map(r=>r.c))].sort((a,b)=>a-b);
+const ages=[...new Set(RC.map(r=>r.k))].sort((a,b)=>a-b);
 const $=id=>document.getElementById(id);
 const mon=c=>{const y=Math.floor(c/100),w=c%100;const j=new Date(Date.UTC(y,0,4));const d=(j.getUTCDay()+6)%7;
   const t=new Date(j.getTime()+((w-1)*7-d)*864e5);return t};
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const cl=c=>`'${String(Math.floor(c/100)).slice(2)}-W${String(c%100).padStart(2,'0')}`;
 const cd=c=>{const t=mon(c);return `w/c ${t.getUTCDate()} ${MN[t.getUTCMonth()]} ${t.getUTCFullYear()}`};
-const soFar=new Set(R.filter(r=>r.k===0&&r.p).map(r=>r.c));
+const soFar=new Set(RC.filter(r=>r.k===0&&r.p).map(r=>r.c));
 const pct=(x,d=1)=>x==null||!isFinite(x)?'–':x.toFixed(d)+'%';
 const inr=x=>x>=1e7?(x/1e7).toFixed(2)+' Cr':x>=1e5?(x/1e5).toFixed(2)+' L':Math.round(x).toLocaleString('en-IN');
-const st={on:new Set(cohorts),partial:false,cap:true,age:1,metric:'share',zoom:1};
+const st={on:new Set(cohorts),partial:false,exOut:false,cap:true,age:1,metric:'share',zoom:1};
 const CAP=150;
 
 function sel(){return R.filter(r=>st.on.has(r.c)&&(st.partial||!r.p))}
@@ -183,6 +195,7 @@ $('quick').querySelectorAll('button').forEach(b=>b.onclick=()=>{const n=b.datase
   st.on=new Set(n==='all'?cohorts:n==='0'?[]:cohorts.slice(-+n));drawChips();draw()});
 $('partial').onchange=e=>{st.partial=e.target.checked;draw()};
 $('cap').onchange=e=>{st.cap=e.target.checked;draw()};
+$('exOut').onchange=e=>{st.exOut=e.target.checked;R=build();draw()};
 function seg(id,items,key,cb){const el=$(id);el.innerHTML='';items.forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.type='button';
   b.setAttribute('aria-pressed',st[key]===v);b.onclick=()=>{st[key]=v;[...el.children].forEach((x,i)=>x.setAttribute('aria-pressed',items[i][0]===v));cb()};el.appendChild(b)})}
 seg('ageSeg',ages.map(k=>[k,'W'+k]),'age',()=>draw());
@@ -319,7 +332,7 @@ function enter(p){
   $('who').firstChild.textContent=p.email;
   $('out').onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}
     try{google.accounts.id.disableAutoSelect()}catch(e){}location.reload()};
-  lw=0;drawChips();draw()}
+  lw=0;R=build();drawChips();draw()}
 function onCred(resp){const p=parseJwt(resp.credential);
   if(allowed(p)){try{localStorage.setItem(KEY,resp.credential)}catch(e){}enter(p)}
   else gerr('That account is not allowed. Sign in with your @'+DOMAIN+' Google account.')}
