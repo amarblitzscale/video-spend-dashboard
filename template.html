@@ -40,13 +40,8 @@ select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);bo
 section{margin-top:32px}
 h2{font-size:15px;font-weight:600;margin:0}
 .sticky{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:10px 0;margin-bottom:0}
-.mini{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:12px}
-.mini .card{padding:12px 12px 6px}
-.mini h3{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:4px}
-.mini h3 small{font-weight:400;color:var(--muted);font-size:12px}
 .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .chip.off .sw{opacity:.35}
-.h3b{margin:22px 0 4px;font-size:14px;font-weight:600}
 .sh{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:10px}
 .sh p{margin:0;color:var(--ink2);font-size:13px;max-width:75ch}
 .stack{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
@@ -173,9 +168,6 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
   <div class="card"><h3><span id="catTitle"></span> <span data-age></span></h3><p class="cap" id="catCap"></p>
     <div class="quick" id="catQuick"></div><div class="chips" id="catChips"></div>
     <div class="chart" id="cmix" style="margin-top:10px"></div></div>
-  <div class="h3b" id="miniTitle"></div>
-  <div class="legend" id="miniLegend"></div>
-  <div class="mini" id="mini"></div>
 </section>
 
 <p class="note">Source: Metabase question 69814e4c. Categories are each seller's top category by orders (level 1); sellers without one are Uncategorised. CPM is spend per 1,000 impressions. CTR is clicks ÷ impressions. CVR is attributed orders ÷ clicks. AOV is attributed GMV ÷ attributed orders. Go-live weeks are ISO weeks, written as 'year-week, for example '26-W45. Partial weeks (the most recent week of each active cohort) are hidden by default. S/GMV above 150% usually means a very small GMV base, so the axis is capped by default and the real value appears in the tooltip.</p>
@@ -363,7 +355,7 @@ function drawCats(){
   const get=(cat,c)=>{const r=idx.get(cat+'|'+c+'|'+st.age);return r&&(st.partial||!r.p)?r:null};
   const xs=cs_.map(c=>({short:cl(c),label:cl(c),sub:cd(c)}));
   $('catTitle').textContent=M.name+(m==='share'?'':', '+(st.ctype==='v'?'video':'non-video'))+' by category';
-  $('catCap').textContent=CMDESC[m]+'. One line per category. The categories you pick here also decide which individual charts appear below.';
+  $('catCap').textContent=CMDESC[m]+'. One line per category. Choose which categories to show.';
   $('ctypeSeg').hidden=m==='share';
   $('catQuick').innerHTML='<button type="button" data-q="6">Top 6</button><button type="button" data-q="all">All</button><button type="button" data-q="0">Clear</button><span>'+st.catOn.size+' of '+CATS.length+' shown</span>';
   $('catQuick').querySelectorAll('button').forEach(b=>b.onclick=()=>{const q=b.dataset.q;st.catOn=new Set(q==='all'?CATS:q==='0'?[]:CATS.slice(0,+q));drawCats()});
@@ -372,16 +364,7 @@ function drawCats(){
   const sers=CATS.filter(c=>st.catOn.has(c)).map(c=>({name:catName(c),color:catColor(c),vals:cs_.map(k=>catVal(get(c,k),m,st.ctype))}));
   line({el:'cmix',label:M.name+' by category',xs,series:sers,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true});
 
-  $('miniTitle').textContent=M.name+' for each selected category';
-  $('miniLegend').innerHTML=m==='share'?'':'<span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i>Non-video</span>';
-  const shown=CATS.filter(c=>st.catOn.has(c));
-  $('mini').innerHTML=!shown.length?'<div class="empty">Select at least one category above to see its chart.</div>':shown.map((c,i)=>{const n=cs_.reduce((a,k)=>{const r=idx.get(c+'|'+k+'|0');return a+(r?r.g:0)},0);
-    return `<div class="card"><h3><span><i class="sw" style="background:${catColor(c)}"></i>${catName(c)}</span><small>${n.toLocaleString('en-IN')} sellers</small></h3><div class="chart" id="m${i}"></div></div>`}).join('');
-  shown.forEach((c,i)=>{const v=cs_.map(k=>get(c,k));
-    const series=m==='share'?[{name:'Video share',color:'var(--video)',vals:v.map(r=>catVal(r,m))}]
-      :[{name:'Video',color:'var(--video)',vals:v.map(r=>catVal(r,m,'v'))},{name:'Non-video',color:'var(--other)',vals:v.map(r=>catVal(r,m,'o'))}];
-    line({el:'m'+i,label:catName(c),xs,series,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,compact:true,
-      extra:j=>{const r=v[j];return r?`${r.g} sellers · ${inr(r.tot)} spend`:'No data for this week yet'}})});
+
 }
 
 function cellVal(r){if(!r)return null;
