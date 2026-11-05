@@ -131,7 +131,7 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
     </div>
   </div>
   <div class="stack">
-    <div class="card"><h3>Video share of Meta spend <span data-age></span></h3><p class="cap">One point per go-live week. Scroll sideways when zoomed in.</p><div class="chart" id="c3"></div></div>
+    <div class="card"><h3>Video share of Meta spend <span data-age></span></h3><p class="cap">One point per go-live week. Dotted line is the average of the selected weeks. Scroll sideways when zoomed in.</p><div class="chart" id="c3"></div></div>
     <div class="card"><h3>S/GMV, video vs non-video <span data-age></span></h3><p class="cap">Spend as % of GMV; lower is more efficient</p>
       <div class="legend"><span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i>Non-video</span></div>
       <div class="chart" id="c4"></div></div>
@@ -246,6 +246,9 @@ function line(cfg){
   cfg.xs.forEach((x,i)=>{if(i%labEvery!==0&&i!==n-1)return;const px=X(i),py=m.t+ih+14;
     s+=rot?`<text transform="translate(${px+3},${py}) rotate(-50)" text-anchor="end">${x.short}</text>`:`<text x="${px}" y="${py+2}" text-anchor="middle">${x.short}</text>`});
   cfg.series.forEach(se=>{
+    const fv=se.vals.filter(v=>v!=null&&isFinite(v));
+    se.avg=fv.length?fv.reduce((a,b)=>a+b,0)/fv.length:null;
+    if(se.avg!=null)s+=`<line x1="0" x2="${W}" y1="${Y(se.avg)}" y2="${Y(se.avg)}" stroke="${se.color}" stroke-opacity=".5" stroke-width="1" stroke-dasharray="2 4"/>`;
     let d='',pen=false;
     se.vals.forEach((v,i)=>{if(v==null||!isFinite(v)){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);pen=true});
     s+=`<path d="${d}" fill="none" stroke="${se.color}" stroke-opacity=".7" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -261,7 +264,8 @@ function line(cfg){
     cx.setAttribute('x1',X(i));cx.setAttribute('x2',X(i));cx.style.display='';
     let t=`<b>${cfg.xs[i].label}</b> <span style="color:var(--muted)">${cfg.xs[i].sub||''}</span>`;
     cfg.series.forEach(se=>{t+=`<div class="r"><span><i style="background:${se.color}"></i>${se.name}</span><span>${(cfg.fmt||pct)(se.vals[i])}</span></div>`});
-    if(cfg.extra)t+=`<div class="m">${cfg.extra(i)}</div>`;showTip(t,ev)};
+    if(cfg.extra)t+=`<div class="m">${cfg.extra(i)}</div>`;
+    t+=`<div class="m">Average of selected weeks: ${cfg.series.map(se=>(cfg.series.length>1?se.name+' ':'')+(cfg.fmt||pct)(se.avg)).join(' · ')}</div>`;showTip(t,ev)};
   h.addEventListener('pointermove',move);h.addEventListener('pointerleave',()=>{cx.style.display='none';hideTip()});
 }
 function lastIdx(a){for(let i=a.length-1;i>=0;i--)if(a[i]!=null&&isFinite(a[i]))return i;return -1}
