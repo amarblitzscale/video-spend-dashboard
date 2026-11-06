@@ -40,6 +40,9 @@ select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);bo
 section{margin-top:32px}
 h2{font-size:15px;font-weight:600;margin:0}
 .sticky{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:10px 0;margin-bottom:0}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px;margin-top:10px}
+.cgrid>div{min-width:0}
+.ctl2{font-size:12px;font-weight:600;color:var(--ink2);margin:0 0 4px}
 .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .chip.off .sw{opacity:.35}
 .sh{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:10px}
@@ -167,7 +170,7 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
   </div>
   <div class="card"><h3><span id="catTitle"></span> <span data-age></span></h3><p class="cap" id="catCap"></p>
     <div class="quick" id="catQuick"></div><div class="chips" id="catChips"></div>
-    <div class="chart" id="cmix" style="margin-top:10px"></div></div>
+    <div class="cgrid" id="cgrid"></div></div>
 </section>
 
 <p class="note">Source: Metabase question 69814e4c. Categories are each seller's top category by orders (level 1); sellers without one are Uncategorised. CPM is spend per 1,000 impressions. CTR is clicks ÷ impressions. CVR is attributed orders ÷ clicks. AOV is attributed GMV ÷ attributed orders. Go-live weeks are ISO weeks, written as 'year-week, for example '26-W45. Partial weeks (the most recent week of each active cohort) are hidden by default. S/GMV above 150% usually means a very small GMV base, so the axis is capped by default and the real value appears in the tooltip.</p>
@@ -260,7 +263,7 @@ function line(cfg){
   const fit=avail/n,base=Math.max(fit,30),pw=cfg.compact?fit:Math.max(base*st.zoom,fit);
   const W=Math.max(n*pw,avail),rot=!cfg.compact&&pw<58;
   const m={t:12,b:rot?58:30},ih=H-m.t-m.b;
-  let top=Math.max(...all);if(cfg.cap&&st.cap)top=Math.min(top,cfg.capAt);
+  let top=Math.max(...all);if(cfg.yTop)top=Math.max(top,cfg.yTop);if(cfg.cap&&st.cap)top=Math.min(top,cfg.capAt);
   const step=niceStep(top/4);top=Math.ceil(top/step)*step;
   const tick=v=>{const d=step>=1?0:step>=.1?1:2;const s=v.toFixed(d);return cfg.unit==='₹'?'₹'+Number(s).toLocaleString('en-IN'):s+'%'};
   const X=i=>(W/n)*(i+.5),Y=v=>m.t+ih-Math.min(v,top)/top*ih;
@@ -342,27 +345,38 @@ const CM={share:{name:'Video share of Meta spend',unit:'%',dec:1},sgmv:{name:'S/
   ctr:{name:'CTR',unit:'%',dec:2},cvr:{name:'CVR',unit:'%',dec:2},aov:{name:'AOV',unit:'₹',dec:0}};
 const CMDESC={share:'Video spend ÷ total Meta spend',sgmv:'Spend ÷ GMV; lower is more efficient',cpm:'Spend per 1,000 impressions; lower is cheaper',
   ctr:'Clicks ÷ impressions',cvr:'Attributed orders ÷ clicks',aov:'Attributed GMV ÷ orders'};
-st.cmet='share';st.ctype='v';st.catOn=new Set(CATS.slice(0,6));
+st.cmet='share';st.ctypes=new Set(['v','o']);st.catOn=new Set(CATS.slice(0,6));
 const catVal=(r,m,s)=>!r?null:m==='share'?(r.tot?r.v/r.tot*100:null):MET[m].f(r,s);
 function syncAge(){['ageSeg','ageSeg2'].forEach(id=>[...$(id).children].forEach((b,i)=>b.setAttribute('aria-pressed',ages[i]===st.age)))}
 seg('ageSeg2',ages.map(k=>[k,'W'+k]),'age',()=>{syncAge();draw()});
 seg('cmetSeg',[['share','Video share'],['sgmv','S/GMV'],['cpm','CPM'],['ctr','CTR'],['cvr','CVR'],['aov','AOV']],'cmet',()=>drawCats());
-seg('ctypeSeg',[['v','Video'],['o','Non-video']],'ctype',()=>drawCats());
+// Video and Non-video can both be on; at least one stays selected.
+function drawTypeSeg(){const el=$('ctypeSeg');el.innerHTML='';
+  [['v','Video'],['o','Non-video']].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;
+    b.setAttribute('aria-pressed',st.ctypes.has(k));
+    b.onclick=()=>{if(st.ctypes.has(k)){if(st.ctypes.size>1)st.ctypes.delete(k)}else st.ctypes.add(k);drawTypeSeg();drawCats()};
+    el.appendChild(b)})}
+drawTypeSeg();
 
 function drawCats(){
   const m=st.cmet,M=CM[m],f=fmtU(M.unit,M.dec),cs_=selCohorts();
   const idx=new Map(RK.map(r=>[r.cat+'|'+r.c+'|'+r.k,r]));
   const get=(cat,c)=>{const r=idx.get(cat+'|'+c+'|'+st.age);return r&&(st.partial||!r.p)?r:null};
   const xs=cs_.map(c=>({short:cl(c),label:cl(c),sub:cd(c)}));
-  $('catTitle').textContent=M.name+(m==='share'?'':', '+(st.ctype==='v'?'video':'non-video'))+' by category';
+  $('catTitle').textContent=M.name+' by category';
   $('catCap').textContent=CMDESC[m]+'. One line per category. Choose which categories to show.';
   $('ctypeSeg').hidden=m==='share';
   $('catQuick').innerHTML='<button type="button" data-q="6">Top 6</button><button type="button" data-q="all">All</button><button type="button" data-q="0">Clear</button><span>'+st.catOn.size+' of '+CATS.length+' shown</span>';
   $('catQuick').querySelectorAll('button').forEach(b=>b.onclick=()=>{const q=b.dataset.q;st.catOn=new Set(q==='all'?CATS:q==='0'?[]:CATS.slice(0,+q));drawCats()});
   $('catChips').innerHTML=CATS.map(c=>`<button type="button" class="chip${st.catOn.has(c)?'':' off'}" data-c="${c}" aria-pressed="${st.catOn.has(c)}"><span class="sw" style="background:${catColor(c)}"></span>${catName(c)}</button>`).join('');
   $('catChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const c=b.dataset.c;st.catOn.has(c)?st.catOn.delete(c):st.catOn.add(c);drawCats()});
-  const sers=CATS.filter(c=>st.catOn.has(c)).map(c=>({name:catName(c),color:catColor(c),vals:cs_.map(k=>catVal(get(c,k),m,st.ctype))}));
-  line({el:'cmix',label:M.name+' by category',xs,series:sers,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true});
+  const types=m==='share'?['v']:['v','o'].filter(k=>st.ctypes.has(k));
+  const picked=CATS.filter(c=>st.catOn.has(c));
+  const data=types.map(ty=>[ty,picked.map(c=>({name:catName(c),color:catColor(c),vals:cs_.map(k=>catVal(get(c,k),m,ty))}))]);
+  // Both charts share one y-axis so video and non-video can be compared by eye.
+  const yTop=Math.max(0,...data.flatMap(([,s])=>s.flatMap(x=>x.vals)).filter(v=>v!=null&&isFinite(v)));
+  $('cgrid').innerHTML=data.map(([ty])=>'<div>'+(m==='share'?'':'<div class="ctl2">'+(ty==='v'?'Video':'Non-video')+'</div>')+'<div class="chart" id="cmix_'+ty+'"></div></div>').join('');
+  data.forEach(([ty,s])=>line({el:'cmix_'+ty,label:M.name+' by category ('+ty+')',xs,series:s,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true,yTop}));
 
 
 }
