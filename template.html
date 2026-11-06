@@ -173,13 +173,21 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
     <div class="cgrid" id="cgrid"></div></div>
 </section>
 
-<p class="note">Source: Metabase question 69814e4c. Categories are each seller's top category by orders (level 1); sellers without one are Uncategorised. CPM is spend per 1,000 impressions. CTR is clicks ÷ impressions. CVR is attributed orders ÷ clicks. AOV is attributed GMV ÷ attributed orders. Go-live weeks are ISO weeks, written as 'year-week, for example '26-W45. Partial weeks (the most recent week of each active cohort) are hidden by default. S/GMV above 150% usually means a very small GMV base, so the axis is capped by default and the real value appears in the tooltip.</p>
+<section id="daySec">
+  <div class="sh"><h2>Daily video share, last 2 months</h2>
+    <label class="chk"><input type="checkbox" id="exHit"> Exclude sellers who have become hit 1s</label></div>
+  <div class="card"><h3>Video share of Meta spend by day</h3><p class="cap" id="dayCap"></p>
+    <div class="chart" id="cday"></div></div>
+</section>
+
+<p class="note">Source: Metabase question 69814e4c. Categories are each seller's top category by orders (level 1); sellers without one are Uncategorised. A hit 1 seller is one who ever had two consecutive weeks of spend above ₹3,500 and P/L above 5% in the HIT team. CPM is spend per 1,000 impressions. CTR is clicks ÷ impressions. CVR is attributed orders ÷ clicks. AOV is attributed GMV ÷ attributed orders. Go-live weeks are ISO weeks, written as 'year-week, for example '26-W45. Partial weeks (the most recent week of each active cohort) are hidden by default. S/GMV above 150% usually means a very small GMV base, so the axis is capped by default and the real value appears in the tooltip.</p>
 </div>
 
 <div class="tip" id="tip"></div>
 
 <script>
 const RAW=__ROWS__;
+const DAILY=__DAILY__;
 // [golive_week, age, class, golives, sellers_spending, sellers_on_video, total_spend, video_spend, other_spend, video_gmv, other_gmv, video_imp, other_imp, video_clk, other_clk, video_orders, other_orders, partial]
 const RC=RAW.map(a=>({c:a[0],k:a[1],cls:a[2],g:a[3],tot:a[6],v:a[7],o:a[8],vg:a[9],og:a[10],vi:a[11],oi:a[12],vc:a[13],oc:a[14],vo:a[15],oo:a[16],p:a[17]===1,cat:a[18]}));
 // One row per cohort x week. Outlier sellers (W0 S/GMV under 5%) are left out when the toggle is on.
@@ -334,6 +342,28 @@ function draw(){
       series:[{name:'Video',color:'var(--video)',vals:rc.map(r=>r?M.f(r,'v'):null)},{name:'Non-video',color:'var(--other)',vals:rc.map(r=>r?M.f(r,'o'):null)}],extra:ex})});
   drawHeat();
   drawCats();
+  drawDaily();
+}
+
+/* ---------- daily video share ---------- */
+// [day, golive_week, class, hit1, sellers, total_spend, video_spend]
+const DC=DAILY.map(a=>({d:a[0],c:a[1],cls:a[2],h:a[3]===1,n:a[4],tot:a[5],v:a[6]}));
+st.exHit=false;
+$('exHit').onchange=e=>{st.exHit=e.target.checked;drawDaily()};
+function drawDaily(){
+  if(!DC.length){$('cday').innerHTML='<div class="empty">Daily data is not connected yet.</div>';$('dayCap').textContent='';return}
+  const by=new Map();
+  DC.forEach(r=>{
+    if(!st.on.has(r.c)||(r.cls==='outlier'&&st.exOut)||(r.h&&st.exHit))return;
+    let x=by.get(r.d);if(!x){x={tot:0,v:0,n:0};by.set(r.d,x)}
+    x.tot+=r.tot;x.v+=r.v;x.n+=r.n});
+  const days=[...by.keys()].sort();
+  const xs=days.map(d=>{const t=new Date(d+'T00:00:00Z');return{short:t.getUTCDate()+' '+MN[t.getUTCMonth()],label:t.toUTCString().slice(0,16),sub:''}});
+  $('dayCap').textContent='Video spend ÷ total Meta spend for each day, for sellers in the go-live weeks selected above. Last 61 days up to yesterday. The dotted line is the average.'
+    +(st.exHit?' Sellers who have become hit 1s are excluded.':'')+(st.exOut?' Outlier sellers are excluded.':'');
+  line({el:'cday',label:'Daily video share of Meta spend',xs,unit:'%',fmt:fmtU('%',1),
+    series:[{name:'Video share',color:'var(--video)',vals:days.map(d=>{const x=by.get(d);return x.tot?x.v/x.tot*100:null})}],
+    extra:i=>{const x=by.get(days[i]);return x.n.toLocaleString('en-IN')+' sellers · '+inr(x.tot)+' spend'}});
 }
 
 /* ---------- categories ---------- */

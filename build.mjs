@@ -22,12 +22,25 @@ const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r
   r.sellers_on_video, r.total_spend, r.video_spend, r.other_spend, r.video_gmv, r.other_gmv, r.video_imp, r.other_imp, r.video_clk, r.other_clk,
   r.video_orders, r.other_orders, r.partial_week ? 1 : 0, r.category]);
 
+// Daily question (day x cohort x class x hit1). Optional: without a URL the daily chart shows "not connected".
+const DAILY_URL = process.env.METABASE_DAILY_URL || '';
+let dd = [];
+if (process.env.LOCAL_DAILY_JSON) dd = JSON.parse(readFileSync(process.env.LOCAL_DAILY_JSON, 'utf8'));   // local testing only
+else if (DAILY_URL) {
+  const r2 = await fetch(DAILY_URL);
+  if (!r2.ok) throw new Error(`Daily question returned ${r2.status}`);
+  dd = await r2.json();
+  for (const k of ['day','golive_week','seller_class','hit1','sellers','total_spend','video_spend'])
+    if (!dd.length || !(k in dd[0])) throw new Error(`Column missing from daily question: ${k}`);
+}
+const daily = dd.map(r => [r.day, r.golive_week, r.seller_class, r.hit1, r.sellers, r.total_spend, r.video_spend]);
 const clientId = process.env.GOOGLE_CLIENT_ID || '';
 if (!clientId) console.warn('GOOGLE_CLIENT_ID is not set: the sign-in page will show "not configured".');
 // The template is written to sit inside a page wrapper; add the document head for standalone hosting.
 const HEAD = '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>html,body{margin:0}img{max-width:100%}</style>\n';
 const html = HEAD + readFileSync('template.html', 'utf8')
   .replace('__ROWS__', JSON.stringify(rows))
+  .replace('__DAILY__', JSON.stringify(daily))
   .replace('__GOOGLE_CLIENT_ID__', clientId);
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', html);
