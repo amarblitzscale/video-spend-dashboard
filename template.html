@@ -278,7 +278,7 @@ function line(cfg){
   cfg.series.forEach(se=>{
     const fv=se.vals.filter(v=>v!=null&&isFinite(v));
     se.avg=fv.length?fv.reduce((a,b)=>a+b,0)/fv.length:null;
-    if(se.avg!=null&&cfg.series.length<=2)s+=`<line x1="0" x2="${W}" y1="${Y(se.avg)}" y2="${Y(se.avg)}" stroke="${se.color}" stroke-opacity=".5" stroke-width="1" stroke-dasharray="2 4"/>`;
+    if(se.avg!=null&&(cfg.series.length<=2||cfg.avgAll))s+=`<line x1="0" x2="${W}" y1="${Y(se.avg)}" y2="${Y(se.avg)}" stroke="${se.color}" stroke-opacity=".5" stroke-width="1" stroke-dasharray="2 4"/>`;
     let d='',pen=false;
     se.vals.forEach((v,i)=>{if(v==null||!isFinite(v)){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);pen=true});
     s+=`<path d="${d}" fill="none" stroke="${se.color}" stroke-opacity=".7" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -294,7 +294,7 @@ function line(cfg){
     cx.setAttribute('x1',X(i));cx.setAttribute('x2',X(i));cx.style.display='';
     let t=`<b>${cfg.xs[i].label}</b> <span style="color:var(--muted)">${cfg.xs[i].sub||''}</span>`;
     const ser=cfg.sort?cfg.series.filter(se=>se.vals[i]!=null&&isFinite(se.vals[i])).sort((a,b)=>b.vals[i]-a.vals[i]):cfg.series;
-    ser.forEach(se=>{t+=`<div class="r"><span><i style="background:${se.color}"></i>${se.name}</span><span>${(cfg.fmt||pct)(se.vals[i])}</span></div>`});
+    ser.forEach(se=>{t+=`<div class="r"><span><i style="background:${se.color}"></i>${se.name}</span><span>${(cfg.fmt||pct)(se.vals[i])}${cfg.sort?` <em style="color:var(--muted);font-style:normal;font-size:11px">avg ${(cfg.fmt||pct)(se.avg)}</em>`:''}</span></div>`});
     if(cfg.extra)t+=`<div class="m">${cfg.extra(i)}</div>`;
     if(!cfg.sort)t+=`<div class="m">Average of selected weeks: ${cfg.series.map(se=>(cfg.series.length>1?se.name+' ':'')+(cfg.fmt||pct)(se.avg)).join(' · ')}</div>`;showTip(t,ev)};
   h.addEventListener('pointermove',move);h.addEventListener('pointerleave',()=>{cx.style.display='none';hideTip()});
@@ -364,7 +364,7 @@ function drawCats(){
   const get=(cat,c)=>{const r=idx.get(cat+'|'+c+'|'+st.age);return r&&(st.partial||!r.p)?r:null};
   const xs=cs_.map(c=>({short:cl(c),label:cl(c),sub:cd(c)}));
   $('catTitle').textContent=M.name+' by category';
-  $('catCap').textContent=CMDESC[m]+'. One line per category. Choose which categories to show.';
+  $('catCap').textContent=CMDESC[m]+'. One line per category; the dotted line in each colour is that category\'s average of the selected weeks. Choose which categories to show.';
   $('ctypeSeg').hidden=m==='share';
   $('catQuick').innerHTML='<button type="button" data-q="6">Top 6</button><button type="button" data-q="all">All</button><button type="button" data-q="0">Clear</button><span>'+st.catOn.size+' of '+CATS.length+' shown</span>';
   $('catQuick').querySelectorAll('button').forEach(b=>b.onclick=()=>{const q=b.dataset.q;st.catOn=new Set(q==='all'?CATS:q==='0'?[]:CATS.slice(0,+q));drawCats()});
@@ -376,7 +376,7 @@ function drawCats(){
   // Both charts share one y-axis so video and non-video can be compared by eye.
   const yTop=Math.max(0,...data.flatMap(([,s])=>s.flatMap(x=>x.vals)).filter(v=>v!=null&&isFinite(v)));
   $('cgrid').innerHTML=data.map(([ty])=>'<div>'+(m==='share'?'':'<div class="ctl2">'+(ty==='v'?'Video':'Non-video')+'</div>')+'<div class="chart" id="cmix_'+ty+'"></div></div>').join('');
-  data.forEach(([ty,s])=>line({el:'cmix_'+ty,label:M.name+' by category ('+ty+')',xs,series:s,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true,yTop}));
+  data.forEach(([ty,s])=>line({el:'cmix_'+ty,label:M.name+' by category ('+ty+')',xs,series:s,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true,avgAll:true,yTop}));
 
 
 }
