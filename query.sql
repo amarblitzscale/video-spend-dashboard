@@ -6,6 +6,9 @@
 --   3. rows are also split by category: the seller's top-level (L1) category with the most orders
 --      (same rule as the "seller level category mapping - L1" question); sellers without one are 'Uncategorised'
 --
+-- Engagement campaigns (objective OUTCOME_ENGAGEMENT / POST_ENGAGEMENT) are excluded from all spend, GMV and
+-- seller_class numbers.
+--
 -- seller_class is decided once per seller from its W0 (golive week) Meta numbers, then applied to W0-W10:
 --   outlier   = W0 GMV > 0 and W0 spend / W0 GMV < 5% (sellers with no W0 GMV are not outliers)
 --   normal    = everyone else
@@ -56,6 +59,7 @@ ads AS (
   JOIN cohort c ON a.seller_id = c.seller_id
   WHERE DATE(a.date_start) >= DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 56 WEEK)
     AND DATE(a.date_start) BETWEEN c.w0_mon AND DATE_ADD(c.w0_mon, INTERVAL 76 DAY)
+    AND IFNULL(a.objective, '') NOT IN ('OUTCOME_ENGAGEMENT', 'POST_ENGAGEMENT')   -- engagement campaigns are left out of every number
 ),
 
 ad_type AS (
