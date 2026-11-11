@@ -4,7 +4,7 @@
 -- hit1 = 1 when the seller ever had two consecutive weeks with team_mapping = 'HIT',
 --        marketing_spend > 3500 and profit_loss_perc2 > 5 (gc_view_3). It applies to the whole period.
 -- seller_class: outlier = W0 GMV > 0 and W0 spend / W0 GMV < 5%, otherwise normal (as in query.sql).
--- Engagement campaigns (objective OUTCOME_ENGAGEMENT / POST_ENGAGEMENT) are excluded.
+-- Only purchase campaigns are counted: sales objective optimised for OFFSITE_CONVERSIONS, RETURN_ON_AD_SPEND or ONSITE_CONVERSIONS.
 -- Days before the cohort's W0 Monday are left out; today is left out because it is still running.
 
 WITH golive AS (
@@ -34,7 +34,8 @@ w0_spend AS (
   JOIN cohort c ON a.seller_id = c.seller_id
   WHERE DATE(a.date_start) >= DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 56 WEEK)
     AND DATE(a.date_start) BETWEEN c.w0_mon AND DATE_ADD(c.w0_mon, INTERVAL 6 DAY)
-    AND IFNULL(a.objective, '') NOT IN ('OUTCOME_ENGAGEMENT', 'POST_ENGAGEMENT')   -- engagement campaigns are left out of every number
+    AND a.objective IN ('OUTCOME_SALES', 'CONVERSIONS', 'PRODUCT_CATALOG_SALES')                  -- purchase campaigns only: sales objective ...
+    AND a.optimization_goal IN ('OFFSITE_CONVERSIONS', 'RETURN_ON_AD_SPEND', 'ONSITE_CONVERSIONS')  -- ... optimised for conversions, not clicks, replies or calls
   GROUP BY 1, 2, 3
 ),
 
@@ -89,7 +90,8 @@ ads AS (
   WHERE DATE(a.date_start) >= DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 61 DAY)
     AND DATE(a.date_start) <  CURRENT_DATE('Asia/Kolkata')
     AND DATE(a.date_start) >= c.w0_mon
-    AND IFNULL(a.objective, '') NOT IN ('OUTCOME_ENGAGEMENT', 'POST_ENGAGEMENT')   -- engagement campaigns are left out of every number
+    AND a.objective IN ('OUTCOME_SALES', 'CONVERSIONS', 'PRODUCT_CATALOG_SALES')                  -- purchase campaigns only: sales objective ...
+    AND a.optimization_goal IN ('OFFSITE_CONVERSIONS', 'RETURN_ON_AD_SPEND', 'ONSITE_CONVERSIONS')  -- ... optimised for conversions, not clicks, replies or calls
 ),
 
 ad_type AS (
