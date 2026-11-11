@@ -24,7 +24,7 @@ const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r
 
 // Daily question (day x cohort x class x hit1). Optional: without a URL the daily chart shows "not connected".
 const DAILY_URL = process.env.METABASE_DAILY_URL ||
-  'https://metabase.kaip.in/api/public/card/bc2471d0-816c-472c-8b55-116daaea11b1/query/json';
+  'https://metabase.kaip.in/api/public/card/58bcb3cd-34ed-4b28-9d85-7b2a6b9b38e4/query/json';
 let dd = [];
 if (process.env.LOCAL_DAILY_JSON) dd = JSON.parse(readFileSync(process.env.LOCAL_DAILY_JSON, 'utf8'));   // local testing only
 else if (DAILY_URL) {
