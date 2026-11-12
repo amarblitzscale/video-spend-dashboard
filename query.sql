@@ -6,6 +6,7 @@
 --   3. rows are also split by category: the seller's top-level (L1) category with the most orders
 --      (same rule as the "seller level category mapping - L1" question); sellers without one are 'Uncategorised'
 --
+-- Sellers with no products, or no store / website, are excluded (they cannot sell, so their spend has no GMV).
 -- Only purchase campaigns are counted: sales objective (OUTCOME_SALES, plus the older CONVERSIONS / PRODUCT_CATALOG_SALES)
 -- optimised for OFFSITE_CONVERSIONS, RETURN_ON_AD_SPEND or ONSITE_CONVERSIONS. Engagement, leads, traffic, awareness,
 -- messages and sales ads optimised for clicks, replies or calls are excluded from all spend, GMV and seller_class numbers.
@@ -23,6 +24,22 @@ WITH golive AS (
   GROUP BY 1
 ),
 
+-- sellers that have set up a shop: at least one product, and a store/website config or profile
+shop_products AS (
+  SELECT DISTINCT seller_id
+  FROM `blitzscale-prod-project.nushop.customer_products`
+  WHERE created_at >= TIMESTAMP('2015-01-01')
+    AND seller_id IN (SELECT seller_id FROM golive)
+),
+
+shop_store AS (
+  SELECT seller_id FROM `blitzscale-prod-project.nushop.web_configs`
+  WHERE created_at >= TIMESTAMP('2015-01-01') AND seller_id IN (SELECT seller_id FROM golive)
+  UNION DISTINCT
+  SELECT seller_id FROM `blitzscale-prod-project.nushop.website_seller_profile`
+  WHERE created_at >= TIMESTAMP('2015-01-01') AND seller_id IN (SELECT seller_id FROM golive)
+),
+
 cohort AS (
   SELECT g.seller_id, g.golive_week,
          MIN(DATE_TRUNC(DATE(v.start_date), ISOWEEK)) AS w0_mon
@@ -31,6 +48,8 @@ cohort AS (
     ON v.seller_id = g.seller_id
    AND CAST(v.year_week AS INT64) = g.golive_week
   WHERE g.golive_week >= CAST(FORMAT_DATE('%G%V', DATE_SUB(CURRENT_DATE('Asia/Kolkata'), INTERVAL 52 WEEK)) AS INT64)
+    AND g.seller_id IN (SELECT seller_id FROM shop_products)   -- sellers with no products,
+    AND g.seller_id IN (SELECT seller_id FROM shop_store)      -- or no store / website, are left out
   GROUP BY 1, 2
 ),
 
