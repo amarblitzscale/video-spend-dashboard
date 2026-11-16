@@ -465,15 +465,19 @@ let started=false;
 function enter(p){
   if(started)return;started=true;
   $('gate').hidden=true;$('app').hidden=false;
+  if(p){
   $('who').innerHTML='<span></span><button type="button" id="out">Sign out</button>';
   $('who').firstChild.textContent=p.email;
   $('out').onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}
     try{google.accounts.id.disableAutoSelect()}catch(e){}location.reload()};
+  }
   lw=0;R=build();drawChips();draw()}
 function onCred(resp){const p=parseJwt(resp.credential);
   if(allowed(p)){try{localStorage.setItem(KEY,resp.credential)}catch(e){}enter(p)}
   else gerr('That account is not allowed. Sign in with your @'+DOMAIN+' Google account.')}
+const REQUIRE_SIGNIN=false; /* sign-in is switched off; set to true to bring the Google gate back */
 function initAuth(){
+  if(!REQUIRE_SIGNIN){enter(null);return}
   if(CLIENT_ID.startsWith('__')||!CLIENT_ID){gerr('Sign-in is not configured yet.');return}
   try{const c=localStorage.getItem(KEY);if(c){const p=parseJwt(c);if(allowed(p)){enter(p);return}localStorage.removeItem(KEY)}}catch(e){}
   const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
