@@ -31,6 +31,7 @@ h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balan
 select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:112px}
 .chk{flex-direction:row!important;align-items:center;gap:6px!important;text-transform:none!important;letter-spacing:0!important;font-size:13px!important;color:var(--ink2)!important;padding-bottom:6px}
 .chk input{accent-color:var(--accent)}
+.nvt{align-items:center!important;gap:8px 10px!important}.nvt .nvh{font-size:13px;color:var(--ink2)}.nvt .chips{margin:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:20px 0}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
@@ -125,6 +126,7 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
     <label class="chk"><input type="checkbox" id="exOut"> Exclude outlier sellers (W0 S/GMV under 5%)</label>
     <label class="chk"><input type="checkbox" id="cap" checked> Cap S/GMV axis at 150%</label>
   </div>
+  <div class="bar nvt" id="nvWrap" hidden><span class="nvh">Non-video includes</span><div class="chips" id="nvChips" role="group" aria-label="Non-video creative types"></div></div>
 </section>
 
 <div class="kpis" id="kpis"></div>
@@ -141,8 +143,8 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
   </div>
   <div class="stack">
     <div class="card"><h3>Video share of Meta spend <span data-age></span></h3><p class="cap">One point per go-live week. Dotted line is the average of the selected weeks. Scroll sideways when zoomed in.</p><div class="chart" id="c3"></div></div>
-    <div class="card"><h3>S/GMV, video vs non-video <span data-age></span></h3><p class="cap">Spend as % of GMV; lower is more efficient</p>
-      <div class="legend"><span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i>Non-video</span></div>
+    <div class="card"><h3>S/GMV, video vs <span class="nvl2">non-video</span> <span data-age></span></h3><p class="cap">Spend as % of GMV; lower is more efficient</p>
+      <div class="legend"><span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i><span class="nvl">Non-video</span></span></div>
       <div class="chart" id="c4"></div></div>
     <div id="more" style="display:contents"></div>
   </div>
@@ -188,8 +190,14 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
 <script>
 const RAW=__ROWS__;
 const DAILY=__DAILY__;
-// [golive_week, age, class, golives, sellers_spending, sellers_on_video, total_spend, video_spend, other_spend, video_gmv, other_gmv, video_imp, other_imp, video_clk, other_clk, video_orders, other_orders, partial]
-const RC=RAW.map(a=>({c:a[0],k:a[1],cls:a[2],g:a[3],tot:a[6],v:a[7],o:a[8],vg:a[9],og:a[10],vi:a[11],oi:a[12],vc:a[13],oc:a[14],vo:a[15],oo:a[16],p:a[17]===1,cat:a[18]}));
+// [golive_week, age, class, golives, sellers_spending, sellers_on_video, total_spend, video_spend, other_spend, video_gmv, other_gmv, video_imp, other_imp, video_clk, other_clk, video_orders, other_orders, partial, category,
+//  then (when the question has them) [spend, gmv, imp, clk, orders] for banner, catalogue and other_type]
+const RC=RAW.map(a=>({c:a[0],k:a[1],cls:a[2],g:a[3],tot:a[6],v:a[7],o:a[8],vg:a[9],og:a[10],vi:a[11],oi:a[12],vc:a[13],oc:a[14],vo:a[15],oo:a[16],p:a[17]===1,cat:a[18],t:a.length>=34?[a.slice(19,24),a.slice(24,29),a.slice(29,34)]:null}));
+// Non-video creative types. 0 banner, 1 catalogue, 2 other (link/share posts with no image or video tagged).
+const HAS_T=RC.length>0&&!!RC[0].t;
+const NVT=['Banners','Catalogue','Other'];
+const NV=()=>{if(!HAS_T||st.nv.size===3)return 'Non-video';const x=[...st.nv].sort().map(i=>NVT[i]).join(' + ');return x.charAt(0)+x.slice(1).toLowerCase()};
+const nvl=()=>NV()==='Non-video'?'non-video':NV().toLowerCase();
 // One row per cohort x week. Outlier sellers (W0 S/GMV under 5%) are left out when the toggle is on.
 function build(){
   const m=new Map(),k=new Map();
@@ -197,8 +205,12 @@ function build(){
   const add=(mp,key,r,extra)=>{let x=mp.get(key);
     if(!x){x=Object.assign({c:r.c,k:r.k,p:false},extra);F.forEach(f=>x[f]=0);mp.set(key,x)}
     F.forEach(f=>x[f]+=r[f]);x.p=x.p||r.p};
-  RC.forEach(r=>{
-    if(r.cls==='outlier'&&st.exOut)return;
+  const nvAll=!HAS_T||st.nv.size===3;
+  RC.forEach(r0=>{
+    if(r0.cls==='outlier'&&st.exOut)return;
+    let r=r0;
+    if(!nvAll){r=Object.assign({},r0,{o:0,og:0,oi:0,oc:0,oo:0});
+      st.nv.forEach(i=>{const t=r0.t[i];r.o+=t[0];r.og+=t[1];r.oi+=t[2];r.oc+=t[3];r.oo+=t[4]})}
     add(m,r.c+'_'+r.k,r,{});add(k,r.cat+'|'+r.c+'|'+r.k,r,{cat:r.cat})});
   const out=[...m.values()];
   out.forEach(x=>{x.vs=x.vg>0?x.v/x.vg*100:null;x.os=x.og>0?x.o/x.og*100:null});
@@ -217,7 +229,7 @@ const cd=c=>{const t=mon(c);return `w/c ${t.getUTCDate()} ${MN[t.getUTCMonth()]}
 const soFar=new Set(RC.filter(r=>r.k===0&&r.p).map(r=>r.c));
 const pct=(x,d=1)=>x==null||!isFinite(x)?'–':x.toFixed(d)+'%';
 const inr=x=>x>=1e7?(x/1e7).toFixed(2)+' Cr':x>=1e5?(x/1e5).toFixed(2)+' L':Math.round(x).toLocaleString('en-IN');
-const st={on:new Set(cohorts),partial:false,exOut:false,cap:true,age:1,metric:'share',view:'v',zoom:1};
+const st={on:new Set(cohorts),partial:false,exOut:false,cap:true,age:1,metric:'share',view:'v',zoom:1,nv:new Set([0,1,2])};
 const CAP=150;
 
 function sel(){return R.filter(r=>st.on.has(r.c)&&(st.partial||!r.p))}
@@ -245,13 +257,22 @@ $('quick').querySelectorAll('button').forEach(b=>b.onclick=()=>{const n=b.datase
 $('partial').onchange=e=>{st.partial=e.target.checked;draw()};
 $('cap').onchange=e=>{st.cap=e.target.checked;draw()};
 $('exOut').onchange=e=>{st.exOut=e.target.checked;R=build();draw()};
+// Non-video creative types: any combination, at least one stays on.
+function drawNv(){
+  document.querySelectorAll('.nvl').forEach(e=>e.textContent=NV());document.querySelectorAll('.nvl2').forEach(e=>e.textContent=nvl());
+  if(!HAS_T)return;$('nvWrap').hidden=false;
+  $('nvChips').innerHTML=NVT.map((n,i)=>`<button type="button" class="chip" data-i="${i}" aria-pressed="${st.nv.has(i)}"${i===2?' title="Link or share posts with no image or video tagged"':''}>${n}</button>`).join('');
+  $('nvChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;
+    if(st.nv.has(i)){if(st.nv.size>1)st.nv.delete(i)}else st.nv.add(i);
+    drawNv();drawViewSeg();drawTypeSeg();R=build();draw()})}
 function seg(id,items,key,cb){const el=$(id);el.innerHTML='';items.forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.type='button';
   b.setAttribute('aria-pressed',st[key]===v);b.onclick=()=>{st[key]=v;[...el.children].forEach((x,i)=>x.setAttribute('aria-pressed',items[i][0]===v));cb()};el.appendChild(b)})}
 seg('ageSeg',ages.map(k=>[k,'W'+k]),'age',()=>{syncAge();draw()});
 const setZ=z=>{st.zoom=Math.max(.4,Math.min(5,z));draw()};
 document.querySelectorAll('.zin').forEach(b=>b.onclick=()=>setZ(st.zoom*1.3));document.querySelectorAll('.zout').forEach(b=>b.onclick=()=>setZ(st.zoom/1.3));document.querySelectorAll('.zfit').forEach(b=>b.onclick=()=>setZ(1));
 seg('metricSeg',[['share','Video share'],['sgmv','S/GMV'],['cpm','CPM'],['ctr','CTR'],['cvr','CVR'],['aov','AOV']],'metric',()=>drawHeat());
-seg('viewSeg',[['v','Video'],['o','Non-video'],['gap','Video − non-video']],'view',()=>drawHeat());
+function drawViewSeg(){seg('viewSeg',[['v','Video'],['o',NV()],['gap','Video − '+nvl()]],'view',()=>drawHeat())}
+drawViewSeg();
 
 /* ---------- tooltip ---------- */
 const tip=$('tip');
@@ -314,8 +335,8 @@ function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x||1)));const f=x
 const EXTRA=[['c5','cpm'],['c6','ctr'],['c7','cvr'],['c8','aov']];
 const EXTRA_INFO={cpm:['CPM, video vs non-video','Spend per 1,000 impressions; lower is cheaper'],ctr:['CTR, video vs non-video','Clicks ÷ impressions; higher is better'],
   cvr:['CVR, video vs non-video','Attributed orders ÷ clicks; higher is better'],aov:['AOV, video vs non-video','Attributed GMV ÷ orders; higher is better']};
-$('more').innerHTML=EXTRA.map(([el,m])=>`<div class="card"><h3>${EXTRA_INFO[m][0]} <span data-age></span></h3><p class="cap">${EXTRA_INFO[m][1]}</p>
-  <div class="legend"><span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i>Non-video</span></div>
+$('more').innerHTML=EXTRA.map(([el,m])=>`<div class="card"><h3>${EXTRA_INFO[m][0].replace('non-video','<span class="nvl2">non-video</span>')} <span data-age></span></h3><p class="cap">${EXTRA_INFO[m][1]}</p>
+  <div class="legend"><span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--other)"></i><span class="nvl">Non-video</span></span></div>
   <div class="chart" id="${el}"></div></div>`).join('');
 function draw(){
   const rows=sel();
@@ -325,7 +346,7 @@ function draw(){
     ['Cohorts',nc,`${gl.toLocaleString('en-IN')} go-lives`],
     ['Meta spend',inr(a.tot),`Video ${inr(a.v)}`],
     ['Video share',pct(a.share),'of Meta spend'],
-    ['Video S/GMV',pct(a.vs),`Non-video ${pct(a.os)}`]
+    ['Video S/GMV',pct(a.vs),`${NV()} ${pct(a.os)}`]
   ].map(([l,v,n])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
 
   const cs_=selCohorts();
@@ -336,10 +357,10 @@ function draw(){
   line({el:'c3',label:'Video share by cohort',xs:xc,
     series:[{name:'Video share',color:'var(--video)',vals:rc.map(r=>r&&r.tot?r.v/r.tot*100:null)}],extra:ex});
   line({el:'c4',label:'S/GMV by cohort',xs:xc,cap:true,capAt:CAP,
-    series:[{name:'Video',color:'var(--video)',vals:rc.map(r=>r&&r.vs>0?r.vs:null)},{name:'Non-video',color:'var(--other)',vals:rc.map(r=>r&&r.os>0?r.os:null)}],extra:ex});
+    series:[{name:'Video',color:'var(--video)',vals:rc.map(r=>r&&r.vs>0?r.vs:null)},{name:NV(),color:'var(--other)',vals:rc.map(r=>r&&r.os>0?r.os:null)}],extra:ex});
   EXTRA.forEach(([el,m])=>{const M=MET[m];
     line({el,label:M.name+' by cohort',xs:xc,unit:M.unit,fmt:fmtU(M.unit,M.unit==='₹'?0:2),
-      series:[{name:'Video',color:'var(--video)',vals:rc.map(r=>r?M.f(r,'v'):null)},{name:'Non-video',color:'var(--other)',vals:rc.map(r=>r?M.f(r,'o'):null)}],extra:ex})});
+      series:[{name:'Video',color:'var(--video)',vals:rc.map(r=>r?M.f(r,'v'):null)},{name:NV(),color:'var(--other)',vals:rc.map(r=>r?M.f(r,'o'):null)}],extra:ex})});
   drawHeat();
   drawCats();
   drawDaily();
@@ -382,7 +403,7 @@ seg('ageSeg2',ages.map(k=>[k,'W'+k]),'age',()=>{syncAge();draw()});
 seg('cmetSeg',[['share','Video share'],['sgmv','S/GMV'],['cpm','CPM'],['ctr','CTR'],['cvr','CVR'],['aov','AOV']],'cmet',()=>drawCats());
 // Video and Non-video can both be on; at least one stays selected.
 function drawTypeSeg(){const el=$('ctypeSeg');el.innerHTML='';
-  [['v','Video'],['o','Non-video']].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;
+  [['v','Video'],['o',NV()]].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;
     b.setAttribute('aria-pressed',st.ctypes.has(k));
     b.onclick=()=>{if(st.ctypes.has(k)){if(st.ctypes.size>1)st.ctypes.delete(k)}else st.ctypes.add(k);drawTypeSeg();drawCats()};
     el.appendChild(b)})}
@@ -405,7 +426,7 @@ function drawCats(){
   const data=types.map(ty=>[ty,picked.map(c=>({name:catName(c),color:catColor(c),vals:cs_.map(k=>catVal(get(c,k),m,ty))}))]);
   // Both charts share one y-axis so video and non-video can be compared by eye.
   const yTop=Math.max(0,...data.flatMap(([,s])=>s.flatMap(x=>x.vals)).filter(v=>v!=null&&isFinite(v)));
-  $('cgrid').innerHTML=data.map(([ty])=>'<div>'+(m==='share'?'':'<div class="ctl2">'+(ty==='v'?'Video':'Non-video')+'</div>')+'<div class="chart" id="cmix_'+ty+'"></div></div>').join('');
+  $('cgrid').innerHTML=data.map(([ty])=>'<div>'+(m==='share'?'':'<div class="ctl2">'+(ty==='v'?'Video':NV())+'</div>')+'<div class="chart" id="cmix_'+ty+'"></div></div>').join('');
   data.forEach(([ty,s])=>line({el:'cmix_'+ty,label:M.name+' by category ('+ty+')',xs,series:s,unit:M.unit,fmt:f,cap:!!M.cap,capAt:CAP,sort:true,avgAll:true,yTop}));
 
 
@@ -443,8 +464,8 @@ function drawHeat(){
   h+='</tbody></table>';$('hm').innerHTML=h;
   $('viewSeg').hidden=st.metric==='share';
   const D={share:'Video share of Meta spend, %.',sgmv:'S/GMV (spend ÷ GMV), %.',cpm:'CPM, spend per 1,000 impressions, ₹.',ctr:'CTR, clicks ÷ impressions, %.',cvr:'CVR, attributed orders ÷ clicks, %.',aov:'AOV, attributed GMV ÷ orders, ₹.'}[st.metric];
-  const V=st.metric==='share'?'':({v:' Video creatives.',o:' Non-video creatives.',gap:' Video minus non-video.'})[st.view];
-  const C=gap?(hb?' Green means video is higher than non-video, red lower, yellow level.':' Green means video is lower than non-video, red higher, yellow level.')
+  const V=st.metric==='share'?'':({v:' Video creatives.',o:' '+NV()+' creatives.',gap:' Video minus '+nvl()+'.'})[st.view];
+  const C=gap?(hb?' Green means video is higher than '+nvl()+', red lower, yellow level.':' Green means video is lower than '+nvl()+', red higher, yellow level.')
             :(hb?' Green is higher, red is lower.':' Green is lower, red is higher.');
   $('hmNote').textContent=D+V+C+' The colour scale runs from the 5th to the 95th percentile so single outliers do not wash out the grid.'+(st.partial?' Dashed cells are partial weeks.':'');
   $('hm').querySelectorAll('td[data-c]').forEach(td=>{
@@ -452,7 +473,7 @@ function drawHeat(){
       const row=m=>{const M=MET[m],f=fmtU(M.unit,M.unit==='₹'?0:2);return `<div class="r"><span>${M.name}</span><span>${f(M.f(r,'v'))} / ${f(M.f(r,'o'))}</span></div>`};
       showTip(`<b>${cl(+r.c)} · W${r.k}</b> <span style="color:var(--muted)">${cd(+r.c)}</span>${r.p?' <span style="color:var(--muted)">(partial)</span>':''}
       <div class="r"><span>Video share</span><span>${pct(r.v/r.tot*100)}</span></div>
-      <div class="m">Video / non-video</div>${['sgmv','cpm','ctr','cvr','aov'].map(row).join('')}
+      <div class="m">Video / ${nvl()}</div>${['sgmv','cpm','ctr','cvr','aov'].map(row).join('')}
       <div class="m">${inr(r.tot)} spend · ${r.g} go-lives</div>`,ev)};
     td.onpointerleave=hideTip});
 }
@@ -471,7 +492,7 @@ function enter(p){
   $('out').onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}
     try{google.accounts.id.disableAutoSelect()}catch(e){}location.reload()};
   }
-  lw=0;R=build();drawChips();draw()}
+  lw=0;R=build();drawNv();drawChips();draw()}
 function onCred(resp){const p=parseJwt(resp.credential);
   if(allowed(p)){try{localStorage.setItem(KEY,resp.credential)}catch(e){}enter(p)}
   else gerr('That account is not allowed. Sign in with your @'+DOMAIN+' Google account.')}

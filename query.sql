@@ -5,6 +5,8 @@
 --      S/GMV, CPM, CTR, CVR (orders / clicks) and AOV (GMV / orders) can be recomputed for any combination
 --   3. rows are also split by category: the seller's top-level (L1) category with the most orders
 --      (same rule as the "seller level category mapping - L1" question); sellers without one are 'Uncategorised'
+--   4. non-video sums are also returned separately for banner (image), catalogue and other_type (link/share
+--      posts with no image or video tagged), so the dashboard can filter non-video by creative type
 --
 -- Sellers with no products, or no store / website, are excluded (they cannot sell, so their spend has no GMV).
 -- Only purchase campaigns are counted: sales objective (OUTCOME_SALES, plus the older CONVERSIONS / PRODUCT_CATALOG_SALES)
@@ -159,6 +161,22 @@ SELECT
   SUM(IF(b.creative != 'video', b.clk, 0))                                 AS other_clk,
   SUM(IF(b.creative = 'video', b.ord, 0))                                  AS video_orders,
   SUM(IF(b.creative != 'video', b.ord, 0))                                 AS other_orders,
+  -- non-video split by creative type (banner + catalogue + other_type = the other_* columns above)
+  ROUND(SUM(IF(b.creative = 'banner', b.spend, 0)))                        AS banner_spend,
+  ROUND(SUM(IF(b.creative = 'banner', b.gmv, 0)))                          AS banner_gmv,
+  SUM(IF(b.creative = 'banner', b.imp, 0))                                 AS banner_imp,
+  SUM(IF(b.creative = 'banner', b.clk, 0))                                 AS banner_clk,
+  SUM(IF(b.creative = 'banner', b.ord, 0))                                 AS banner_orders,
+  ROUND(SUM(IF(b.creative = 'catalogue', b.spend, 0)))                     AS catalogue_spend,
+  ROUND(SUM(IF(b.creative = 'catalogue', b.gmv, 0)))                       AS catalogue_gmv,
+  SUM(IF(b.creative = 'catalogue', b.imp, 0))                              AS catalogue_imp,
+  SUM(IF(b.creative = 'catalogue', b.clk, 0))                              AS catalogue_clk,
+  SUM(IF(b.creative = 'catalogue', b.ord, 0))                              AS catalogue_orders,
+  ROUND(SUM(IF(b.creative = 'other', b.spend, 0)))                         AS other_type_spend,   -- link/share posts with no image or video tagged
+  ROUND(SUM(IF(b.creative = 'other', b.gmv, 0)))                           AS other_type_gmv,
+  SUM(IF(b.creative = 'other', b.imp, 0))                                  AS other_type_imp,
+  SUM(IF(b.creative = 'other', b.clk, 0))                                  AS other_type_clk,
+  SUM(IF(b.creative = 'other', b.ord, 0))                                  AS other_type_orders,
   ANY_VALUE(DATE_ADD(c.w0_mon, INTERVAL b.wk * 7 + 6 DAY)) >= CURRENT_DATE('Asia/Kolkata') AS partial_week
 FROM base b
 JOIN seller_cls sc USING (golive_week, seller_id)
