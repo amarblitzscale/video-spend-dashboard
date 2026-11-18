@@ -18,9 +18,9 @@ const need = ['golive_week','week_since_golive','seller_class','golives','seller
   'video_orders','other_orders','partial_week','category'];
 for (const k of need) if (!(k in d[0])) throw new Error(`Column missing from question: ${k}`);
 
-// Non-video split by creative type (banner / catalogue / other). Optional: if the question doesn't return these
+// Non-video split by creative type (banner / catalogue). Optional: if the question doesn't return these
 // columns yet, the page hides the creative-type toggle and shows all non-video as before.
-const TYPES = ['banner', 'catalogue', 'other_type'], PARTS = ['spend', 'gmv', 'imp', 'clk', 'orders'];
+const TYPES = ['banner', 'catalogue'], PARTS = ['spend', 'gmv', 'imp', 'clk', 'orders'];
 const hasTypes = TYPES.every(t => PARTS.every(p => `${t}_${p}` in d[0]));
 if (!hasTypes) console.warn('Creative-type columns not found: the non-video toggle will be hidden.');
 const rows = d.map(r => [r.golive_week, +String(r.week_since_golive).slice(1), r.seller_class, r.golives, r.sellers_spending,

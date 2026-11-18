@@ -191,12 +191,12 @@ td.pt{outline:1px dashed var(--muted);outline-offset:-2px}
 const RAW=__ROWS__;
 const DAILY=__DAILY__;
 // [golive_week, age, class, golives, sellers_spending, sellers_on_video, total_spend, video_spend, other_spend, video_gmv, other_gmv, video_imp, other_imp, video_clk, other_clk, video_orders, other_orders, partial, category,
-//  then (when the question has them) [spend, gmv, imp, clk, orders] for banner, catalogue and other_type]
-const RC=RAW.map(a=>({c:a[0],k:a[1],cls:a[2],g:a[3],tot:a[6],v:a[7],o:a[8],vg:a[9],og:a[10],vi:a[11],oi:a[12],vc:a[13],oc:a[14],vo:a[15],oo:a[16],p:a[17]===1,cat:a[18],t:a.length>=34?[a.slice(19,24),a.slice(24,29),a.slice(29,34)]:null}));
-// Non-video creative types. 0 banner, 1 catalogue, 2 other (link/share posts with no image or video tagged).
+//  then (when the question has them) [spend, gmv, imp, clk, orders] for banner and catalogue]
+const RC=RAW.map(a=>({c:a[0],k:a[1],cls:a[2],g:a[3],tot:a[6],v:a[7],o:a[8],vg:a[9],og:a[10],vi:a[11],oi:a[12],vc:a[13],oc:a[14],vo:a[15],oo:a[16],p:a[17]===1,cat:a[18],t:a.length>=29?[a.slice(19,24),a.slice(24,29)]:null}));
+// Non-video creative types. 0 banner, 1 catalogue (everything non-video that is not a banner).
 const HAS_T=RC.length>0&&!!RC[0].t;
-const NVT=['Banners','Catalogue','Other'];
-const NV=()=>{if(!HAS_T||st.nv.size===3)return 'Non-video';const x=[...st.nv].sort().map(i=>NVT[i]).join(' + ');return x.charAt(0)+x.slice(1).toLowerCase()};
+const NVT=['Banners','Catalogue'];
+const NV=()=>{if(!HAS_T||st.nv.size===NVT.length)return 'Non-video';const x=[...st.nv].sort().map(i=>NVT[i]).join(' + ');return x.charAt(0)+x.slice(1).toLowerCase()};
 const nvl=()=>NV()==='Non-video'?'non-video':NV().toLowerCase();
 // One row per cohort x week. Outlier sellers (W0 S/GMV under 5%) are left out when the toggle is on.
 function build(){
@@ -205,7 +205,7 @@ function build(){
   const add=(mp,key,r,extra)=>{let x=mp.get(key);
     if(!x){x=Object.assign({c:r.c,k:r.k,p:false},extra);F.forEach(f=>x[f]=0);mp.set(key,x)}
     F.forEach(f=>x[f]+=r[f]);x.p=x.p||r.p};
-  const nvAll=!HAS_T||st.nv.size===3;
+  const nvAll=!HAS_T||st.nv.size===NVT.length;
   RC.forEach(r0=>{
     if(r0.cls==='outlier'&&st.exOut)return;
     let r=r0;
@@ -229,7 +229,7 @@ const cd=c=>{const t=mon(c);return `w/c ${t.getUTCDate()} ${MN[t.getUTCMonth()]}
 const soFar=new Set(RC.filter(r=>r.k===0&&r.p).map(r=>r.c));
 const pct=(x,d=1)=>x==null||!isFinite(x)?'–':x.toFixed(d)+'%';
 const inr=x=>x>=1e7?(x/1e7).toFixed(2)+' Cr':x>=1e5?(x/1e5).toFixed(2)+' L':Math.round(x).toLocaleString('en-IN');
-const st={on:new Set(cohorts),partial:false,exOut:false,cap:true,age:1,metric:'share',view:'v',zoom:1,nv:new Set([0,1,2])};
+const st={on:new Set(cohorts),partial:false,exOut:false,cap:true,age:1,metric:'share',view:'v',zoom:1,nv:new Set([0,1])};
 const CAP=150;
 
 function sel(){return R.filter(r=>st.on.has(r.c)&&(st.partial||!r.p))}
@@ -261,7 +261,7 @@ $('exOut').onchange=e=>{st.exOut=e.target.checked;R=build();draw()};
 function drawNv(){
   document.querySelectorAll('.nvl').forEach(e=>e.textContent=NV());document.querySelectorAll('.nvl2').forEach(e=>e.textContent=nvl());
   if(!HAS_T)return;$('nvWrap').hidden=false;
-  $('nvChips').innerHTML=NVT.map((n,i)=>`<button type="button" class="chip" data-i="${i}" aria-pressed="${st.nv.has(i)}"${i===2?' title="Link or share posts with no image or video tagged"':''}>${n}</button>`).join('');
+  $('nvChips').innerHTML=NVT.map((n,i)=>`<button type="button" class="chip" data-i="${i}" aria-pressed="${st.nv.has(i)}">${n}</button>`).join('');
   $('nvChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;
     if(st.nv.has(i)){if(st.nv.size>1)st.nv.delete(i)}else st.nv.add(i);
     drawNv();drawViewSeg();drawTypeSeg();R=build();draw()})}
